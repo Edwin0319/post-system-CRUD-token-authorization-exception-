@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post System - CRUD with JWT Authorization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .auth-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .auth-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .status-indicator {
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status-logged-in {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-logged-out {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .login-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        input[type="text"],
+        input[type="search"],
+        textarea {
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        input[type="text"]:focus,
+        input[type="search"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-success {
+            background: #10b981;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .posts-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .create-post-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .search-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .posts-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .post-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            transition: box-shadow 0.3s;
+        }
+        
+        .post-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+        
+        .post-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        
+        .post-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        
+        .post-content {
+            color: #374151;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .post-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .post-actions button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .edit-form {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Post System</h1>
+            <p>CRUD Operations with JWT Token Authorization</p>
+        </header>
+        
+        <div class="auth-section">
+            <h2>Authentication</h2>
+            <div class="auth-status">
+                <div>
+                    <span id="authStatus" class="status-indicator status-logged-out">Not Authenticated</span>
+                </div>
+                <div id="loginFormContainer">
+                    <div class="login-form">
+                        <input type="text" id="username" placeholder="Enter username" />
+                        <button onclick="login()">Login</button>
+                    </div>
+                </div>
+                <div id="logoutContainer" class="hidden">
+                    <button onclick="logout()" class="btn-danger">Logout</button>
+                </div>
+            </div>
+            <div id="authMessage"></div>
+        </div>
+        
+        <div class="posts-section">
+            <h2>Posts Management</h2>
+            
+            <div id="createPostSection" class="create-post-form hidden">
+                <h3>Create New Post</h3>
+                <div class="form-group">
+                    <label for="postTitle">Title</label>
+                    <input type="text" id="postTitle" placeholder="Enter post title" />
+                </div>
+                <div class="form-group">
+                    <label for="postContent">Content</label>
+                    <textarea id="postContent" placeholder="Enter post content"></textarea>
+                </div>
+                <button onclick="createPost()" class="btn-success">Create Post</button>
+                <div id="createMessage"></div>
+            </div>
+            
+            <div class="search-bar">
+                <input type="search" id="searchKeyword" placeholder="Search posts by title..." />
+                <button onclick="searchPosts()">Search</button>
+                <button onclick="loadPosts()">Show All</button>
+            </div>
+            
+            <div id="postsMessage"></div>
+            <div id="postsList" class="posts-list"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api';
+        let currentToken = localStorage.getItem('token');
+        let currentUsername = localStorage.getItem('username');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            if (currentToken && currentUsername) {
+                validateToken();
+            }
+            loadPosts();
+        });
+        
+        function setAuthStatus(isAuthenticated, username = '') {
+            const statusElement = document.getElementById('authStatus');
+            const loginContainer = document.getElementById('loginFormContainer');
+            const logoutContainer = document.getElementById('logoutContainer');
+            const createSection = document.getElementById('createPostSection');
+            
+            if (isAuthenticated) {
+                statusElement.textContent = `Logged in as: ${username}`;
+                statusElement.className = 'status-indicator status-logged-in';
+                loginContainer.classList.add('hidden');
+                logoutContainer.classList.remove('hidden');
+                createSection.classList.remove('hidden');
+            } else {
+                statusElement.textContent = 'Not Authenticated';
+                statusElement.className = 'status-indicator status-logged-out';
+                loginContainer.classList.remove('hidden');
+                logoutContainer.classList.add('hidden');
+                createSection.classList.add('hidden');
+            }
+        }
+        
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const messageDiv = document.getElementById('authMessage');
+            
+            if (!username) {
+                showMessage(messageDiv, 'Please enter a username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    currentToken = data.token;
+                    currentUsername = data.username;
+                    localStorage.setItem('token', currentToken);
+                    localStorage.setItem('username', currentUsername);
+                    setAuthStatus(true, currentUsername);
+                    showMessage(messageDiv, 'Login successful!', 'success');
+                    document.getElementById('username').value = '';
+                } else {
+                    showMessage(messageDiv, 'Login failed', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function validateToken() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/validate`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.valid) {
+                        setAuthStatus(true, currentUsername);
+                    } else {
+                        logout();
+                    }
+                } else {
+                    logout();
+                }
+            } catch (error) {
+                console.error('Token validation error:', error);
+                logout();
+            }
+        }
+        
+        function logout() {
+            currentToken = null;
+            currentUsername = null;
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            setAuthStatus(false);
+            document.getElementById('authMessage').innerHTML = '';
+        }
+        
+        async function createPost() {
+            const title = document.getElementById('postTitle').value.trim();
+            const content = document.getElementById('postContent').value.trim();
+            const messageDiv = document.getElementById('createMessage');
+            
+            if (!title || !content) {
+                showMessage(messageDiv, 'Please fill in all fields', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/posts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+                
+                if (response.ok) {
+                    showMessage(messageDiv, 'Post created successfully!', 'success');
+                    document.getElementById('postTitle').value = '';
+                    document.getElementById('postContent').value = '';
+                    loadPosts();
+                } else {
+                    const error = await response.json();
+                    showMessage(messageDiv, error.message || 'Failed to create post', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadPosts() {
+            const messageDiv = document.getElementById('postsMessage');
+            const postsListDiv = document.getElementById('postsList');
+            
+            try {
+                const headers = {};
+                if (currentToken) {
+                    headers['Authorization'] = `Bearer ${currentToken}`;
+                }
+                
+                const response = await fetch(`${API_BASE}/posts`, { headers });
+                
+                if (response.ok) {
+                    const posts = await response.json();
+                    displayPosts(posts);
+                    messageDiv.innerHTML = '';
+                } else {
+                    showMessage(messageDiv, 'Failed to load posts', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function searchPosts() {
+            const keyword = document.getElementById('searchKeyword').value.trim();
+            const messageDiv = document.getElementById('postsMessage');
+            
+            if (!keyword) {
+                loadPosts();
+                return;
+            }
+            
+            try {
+                const headers = {};
+                if (currentToken) {
+                    headers['Authorization'] = `Bearer ${currentToken}`;
+                }
+                
+                const response = await fetch(`${API_BASE}/posts/search?keyword=${encodeURIComponent(keyword)}`, { headers });
+                
+                if (response.ok) {
+                    const posts = await response.json();
+                    displayPosts(posts);
+                    messageDiv.innerHTML = '';
+                } else {
+                    showMessage(messageDiv, 'Failed to search posts', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        function displayPosts(posts) {
+            const postsListDiv = document.getElementById('postsList');
+            
+            if (posts.length === 0) {
+                postsListDiv.innerHTML = '<p style="text-align: center; color: #6b7280;">No posts found</p>';
+                return;
+            }
+            
+            postsListDiv.innerHTML = posts.map(post => `
+                <div class="post-card" id="post-${post.id}">
+                    <div class="post-header">
+                        <div>
+                            <div class="post-title">${escapeHtml(post.title)}</div>
+                            <div class="post-meta">
+                                By ${escapeHtml(post.author)} | 
+                                Created: ${formatDate(post.createdAt)} | 
+                                Updated: ${formatDate(post.updatedAt)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="post-content">${escapeHtml(post.content)}</div>
+                    ${currentToken ? `
+                        <div class="post-actions">
+                            <button onclick="showEditForm(${post.id})">Edit</button>
+                            <button onclick="deletePost(${post.id})" class="btn-danger">Delete</button>
+                        </div>
+                        <div id="edit-form-${post.id}" class="edit-form hidden">
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="edit-title-${post.id}" value="${escapeHtml(post.title)}" />
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <textarea id="edit-content-${post.id}">${escapeHtml(post.content)}</textarea>
+                            </div>
+                            <button onclick="updatePost(${post.id})" class="btn-success">Save</button>
+                            <button onclick="hideEditForm(${post.id})">Cancel</button>
+                            <div id="edit-message-${post.id}"></div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function showEditForm(postId) {
+            document.getElementById(`edit-form-${postId}`).classList.remove('hidden');
+        }
+        
+        function hideEditForm(postId) {
+            document.getElementById(`edit-form-${postId}`).classList.add('hidden');
+            document.getElementById(`edit-message-${postId}`).innerHTML = '';
+        }
+        
+        async function updatePost(postId) {
+            const title = document.getElementById(`edit-title-${postId}`).value.trim();
+            const content = document.getElementById(`edit-content-${postId}`).value.trim();
+            const messageDiv = document.getElementById(`edit-message-${postId}`);
+            
+            if (!title || !content) {
+                showMessage(messageDiv, 'Please fill in all fields', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/posts/${postId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+                
+                if (response.ok) {
+                    showMessage(messageDiv, 'Post updated successfully!', 'success');
+                    setTimeout(() => {
+                        hideEditForm(postId);
+                        loadPosts();
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    showMessage(messageDiv, error.message || 'Failed to update post', 'error');
+                }
+            } catch (error) {
+                showMessage(messageDiv, 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function deletePost(postId) {
+            if (!confirm('Are you sure you want to delete this post?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/posts/${postId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    loadPosts();
+                } else {
+                    alert('Failed to delete post');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        function showMessage(element, message, type) {
+            element.innerHTML = `<div class="${type}-message">${message}</div>`;
+            setTimeout(() => {
+                element.innerHTML = '';
+            }, 3000);
+        }
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+    </script>
+</body>
+</html>
