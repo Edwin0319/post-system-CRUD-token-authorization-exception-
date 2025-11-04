@@ -23,7 +23,9 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
         }
         
-        // Generate token for any username (simplified for demo)
+        // TODO: In production, validate username/password against a user database
+        // Example: if (!userService.authenticate(username, password)) return 401;
+        // This is a simplified demo that generates a token for any username
         String token = jwtUtil.generateToken(username);
         
         Map<String, String> response = new HashMap<>();

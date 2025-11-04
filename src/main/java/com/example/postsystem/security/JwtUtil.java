@@ -15,6 +15,8 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
     
+    // TODO: In production, move this to application.properties or environment variable
+    // Example: @Value("${jwt.secret}") private String secretKey;
     private static final String SECRET_KEY = "mysecretkeymysecretkeymysecretkeymysecretkey";
     private static final long EXPIRATION_TIME = 86400000; // 24 hours
     
