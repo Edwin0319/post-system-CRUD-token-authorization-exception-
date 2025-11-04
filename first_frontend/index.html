@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>我的博客</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+        h1, h2, h3 { color: #333; }
+        ul { padding-left: 0; }
+        #post-list li { 
+            background: #fff; 
+            margin-bottom: 10px; 
+            padding: 15px; 
+            border-radius: 5px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            /* (新) 为了定位按钮 */
+            position: relative; 
+        }
+        
+        /* 表单样式 */
+        .form-container { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-container input, .form-container textarea {
+            width: calc(100% - 20px);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-container button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px; /* (新) 按钮间距 */
+        }
+        .form-container button:hover { background-color: #0056b3; }
+        .error { color: red; font-size: 0.9em; }
+
+        /* 登录状态 */
+        #user-container { background: #e6f7ff; border: 1px solid #b3e0ff; padding: 15px; border-radius: 5px; }
+        #user-container button { background-color: #dc3545; }
+        #user-container button:hover { background-color: #c82333; }
+        
+        /* (新) 文章操作按钮 */
+        .post-actions {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+        }
+        .post-actions button {
+            font-size: 0.8em;
+            padding: 5px 8px;
+            margin-left: 5px;
+        }
+        .btn-update { background-color: #ffc107; color: #333; }
+        .btn-update:hover { background-color: #e0a800; }
+        .btn-delete { background-color: #dc3545; color: white; }
+        .btn-delete:hover { background-color: #c82333; }
+        
+        /* (新) 取消编辑按钮 */
+        .btn-cancel { background-color: #6c757d; }
+        .btn-cancel:hover { background-color: #5a6268; }
+
+
+        /* (辅助) 默认隐藏 */
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-container" class="form-container">
+        <h3>登录或注册</h3>
+        <form id="login-form">
+            <input type="text" id="login-username" placeholder="用户名" required>
+            <input type="password" id="login-password" placeholder="密码" required>
+            <button type="submit">登录</button>
+            <button type="button" id="register-button" style="background-color: #28a745;">注册</button>
+            <p id="auth-error" class="error"></p>
+        </form>
+    </div>
+
+    <div id="user-container" class="form-container hidden">
+        <h3 id="welcome-message"></h3>
+        <button id="logout-button">登出</button>
+    </div>
+
+    <div id="post-editor-container" class="form-container hidden">
+        <h3 id="editor-title">发表新文章</h3>
+        <form id="post-editor-form">
+            <input type="text" id="post-title" placeholder="文章标题" required>
+            <textarea id="post-content" rows="5" placeholder="文章内容..." required></textarea>
+            <button type="submit" id="editor-submit-button">发表</button>
+            <button type="button" id="cancel-edit-button" class="btn-cancel hidden">取消编辑</button>
+            <p id="post-error" class="error"></p>
+        </form>
+    </div>
+
+
+    <h1>我的博客文章</h1>
+    <ul id="post-list">
+        </ul>
+
+    <script>
+        // --- (新) 全局常量和变量 ---
+        const API_BASE_URL = 'http://localhost:8080/api';
+        
+        // (新) 用来存储当前登录的用户名
+        let currentUsername = null; 
+        
+        // (新) 用来存储正在编辑的文章 ID
+        let currentEditingPostId = null;
+
+        
+        // (辅助函数) 简单解析 JWT (仅用于获取用户名，不用于验证)
+        function parseJwt(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                console.error("解析 Token 失败:", e);
+                return null;
+            }
+        }
+
+
+        // --- (新) UI 更新函数 ---
+        
+        // 设置为“访客”界面
+        function setupGuestUI() {
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('user-container').classList.add('hidden');
+            document.getElementById('post-editor-container').classList.add('hidden');
+            document.getElementById('welcome-message').textContent = '';
+            
+            // (新) 登出时清除用户名
+            currentUsername = null; 
+        }
+
+        // 设置为“已登录”界面
+        function setupAuthenticatedUI(token) {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('user-container').classList.remove('hidden');
+            document.getElementById('post-editor-container').classList.remove('hidden');
+            
+            const payload = parseJwt(token);
+            if (payload && payload.sub) {
+                // (新) 关键：保存当前用户名
+                currentUsername = payload.sub; 
+                document.getElementById('welcome-message').textContent = `欢迎你, ${currentUsername}!`;
+            } else {
+                document.getElementById('welcome-message').textContent = '欢迎你!';
+                currentUsername = null; // (解析失败)
+            }
+        }
+        
+        // (新) 重置文章编辑器到“创建”状态
+        function resetPostEditor() {
+            document.getElementById('editor-title').textContent = '发表新文章';
+            document.getElementById('editor-submit-button').textContent = '发表';
+            document.getElementById('cancel-edit-button').classList.add('hidden');
+            document.getElementById('post-editor-form').reset();
+            document.getElementById('post-error').textContent = '';
+            currentEditingPostId = null;
+        }
+
+        // (新) 检查登录状态 (页面加载时调用)
+        function checkLoginState() {
+            const token = localStorage.getItem('jwt-token');
+            if (token) {
+                setupAuthenticatedUI(token);
+            } else {
+                setupGuestUI();
+            }
+        }
+
+        // --- (新) 事件处理函数 ---
+
+        // 处理登录
+        async function handleLogin(event) {
+            event.preventDefault(); // 阻止表单默认提交
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const errorElement = document.getElementById('auth-error');
+            errorElement.textContent = ''; // 清除旧错误
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    // (新) 尝试解析后端的 ErrorResponseDTO
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        throw new Error(errorData.message || '登录失败');
+                    } catch (e) {
+                        throw new Error(errorText || '登录失败');
+                    }
+                }
+
+                const data = await response.json(); // (LoginResponseDTO)
+                localStorage.setItem('jwt-token', data.token); // (关键) 保存 Token
+                checkLoginState(); // 刷新 UI
+                loadPosts(); // (新) 登录后刷新文章列表，以显示按钮
+                document.getElementById('login-form').reset(); // 清空表单
+
+            } catch (error) {
+                console.error('登录出错:', error);
+                errorElement.textContent = `${error.message}`; // (显示更清晰的错误)
+            }
+        }
+
+        // 处理注册 (和登录类似)
+        async function handleRegister(event) {
+            event.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const email = `${username}@example.com`; // 临时 email
+            const errorElement = document.getElementById('auth-error');
+            errorElement.textContent = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, email })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text(); // (后端直接返回字符串)
+                    throw new Error(errorText || '注册失败');
+                }
+                
+                errorElement.textContent = '注册成功！请使用刚才的账号登录。';
+                document.getElementById('login-form').reset();
+
+            } catch (error) {
+                console.error('注册出错:', error);
+                errorElement.textContent = `${error.message}`; // (显示更清晰的错误)
+            }
+        }
+
+        // 处理登出
+        function handleLogout() {
+            localStorage.removeItem('jwt-token'); // (关键) 清除 Token
+            checkLoginState(); // 刷新 UI
+            loadPosts(); // (新) 登出后刷新文章列表，以隐藏按钮
+            resetPostEditor(); // (新) 重置编辑器
+        }
+
+        // (修改) 处理“发表”或“更新”文章
+        async function handleSubmitPost(event) {
+            event.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+            const errorElement = document.getElementById('post-error');
+            errorElement.textContent = '';
+
+            const token = localStorage.getItem('jwt-token'); // (关键) 获取 Token
+            if (!token) {
+                errorElement.textContent = '你尚未登录，请刷新页面。';
+                return;
+            }
+            
+            let url;
+            let method;
+
+            // (新) 关键：判断是“创建”还是“更新”
+            if (currentEditingPostId) {
+                // 是“更新”
+                url = `${API_BASE_URL}/put/${currentEditingPostId}`;
+                method = 'PUT';
+            } else {
+                // 是“创建”
+                url = `${API_BASE_URL}/post`;
+                method = 'POST';
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: method, // (使用动态方法)
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` // (关键) 携带 Token
+                    },
+                    body: JSON.stringify({ title, content }) // (PostCreateDTO 和 PostUpdateDTO 结构相同)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    try {
+                        // (新) 处理来自 GlobalExceptionHandler 的 403 错误
+                        const errorData = JSON.parse(errorText); 
+                        throw new Error(errorData.message || '操作失败');
+                    } catch(e) {
+                         throw new Error(errorText || '操作失败');
+                    }
+                }
+                
+                resetPostEditor(); // (新) 成功后重置编辑器
+                loadPosts(); // (重要) 刷新文章列表
+
+            } catch (error) {
+                console.error('发表/更新出错:', error);
+                errorElement.textContent = `操作失败: ${error.message}`; // (显示 403 错误)
+            }
+        }
+        
+        // (新) 处理删除
+        async function handleDeletePost(postId) {
+            if (!confirm(`确定要删除文章 ${postId} 吗？`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('jwt-token');
+            if (!token) {
+                alert('登录已过期，请重新登录。');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/delete/${postId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}` // (关键) 携带 Token
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.message || '删除失败');
+                }
+                
+                // 删除成功
+                loadPosts(); // 刷新列表
+                
+            } catch (error) {
+                console.error('删除出错:', error);
+                alert(`删除失败: ${error.message}`); // (例如，"权限不足：您没有权限操作此文章")
+            }
+        }
+        
+        // (新) 处理点击“更新”按钮（准备编辑）
+        function handleStartUpdate(postId, postTitle) {
+            // (注意: PostListDTO 没有 content，所以我们只能预填 title)
+            // (一个更好的设计是点击"更新"时，先 GET /api/get/{id} 获取详情)
+            
+            document.getElementById('editor-title').textContent = `正在编辑文章: ${postId}`;
+            document.getElementById('editor-submit-button').textContent = '确认更新';
+            document.getElementById('cancel-edit-button').classList.remove('hidden');
+            document.getElementById('post-title').value = postTitle;
+            document.getElementById('post-content').value = ""; // (无法预填，提示用户)
+            document.getElementById('post-content').placeholder = "请输入新的文章内容...";
+            
+            currentEditingPostId = postId;
+            
+            // (新) 滚动到编辑器，方便操作
+            document.getElementById('post-editor-container').scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+        // --- (这是你原来的函数，做了修改) ---
+        function loadPosts() {
+            const postListElement = document.getElementById('post-list');
+
+            console.log("正在从后端加载文章列表...");
+            
+            fetch(`${API_BASE_URL}/get`) // <-- 你的 API 地址
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应失败: ' + response.statusText);
+                    }
+                    return response.json(); 
+                })
+                .then(posts => {
+                    console.log('成功从后端获取到数据:', posts);
+                    postListElement.innerHTML = ''; // (重要) 先清空旧列表
+
+                    // 4. 遍历数组，把数据显示在 HTML 上
+                    posts.forEach(post => {
+                        
+                        // (新) 准备操作按钮的 HTML
+                        let actionsHtml = '';
+                        // (关键检查) 如果当前登录了，并且用户名和文章作者匹配
+                        if (currentUsername && currentUsername === post.authorName) {
+                            actionsHtml = `
+                                <div class="post-actions">
+                                    <button class="btn-update" data-post-id="${post.id}" data-post-title="${post.title}">更新</button>
+                                    <button class="btn-delete" data-post-id="${post.id}">删除</button>
+                                </div>
+                            `;
+                        }
+
+                        // (修改) 插入包含按钮的 HTML
+                        postListElement.innerHTML += `
+                            <li>
+                                ${actionsHtml} <h2>${post.title}</h2>
+                                <p>作者: ${post.authorName}</p>
+                            </li>
+                        `;
+                    });
+                })
+                .catch(error => {
+                    console.error('Fetch API 出错了:', error);
+                    postListElement.innerHTML = `<li><p class="error">无法加载文章列表: ${error.message}</p></li>`;
+                });
+        }
+        
+
+        // --- (新) 页面加载总入口 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. 绑定“表单”事件监听器
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('register-button').addEventListener('click', handleRegister);
+            document.getElementById('logout-button').addEventListener('click', handleLogout);
+            document.getElementById('post-editor-form').addEventListener('submit', handleSubmitPost);
+            document.getElementById('cancel-edit-button').addEventListener('click', resetPostEditor);
+            
+            // 2. (新) 绑定“文章列表”的事件委托
+            // (我们监听整个列表，而不是单个按钮，这样动态添加的按钮也能响应)
+            document.getElementById('post-list').addEventListener('click', (event) => {
+                const target = event.target;
+                
+                if (target.classList.contains('btn-delete')) {
+                    const postId = target.dataset.postId;
+                    handleDeletePost(postId);
+                }
+                
+                if (target.classList.contains('btn-update')) {
+                    const postId = target.dataset.postId;
+                    const postTitle = target.dataset.postTitle;
+                    handleStartUpdate(postId, postTitle);
+                }
+            });
+
+            // 3. 检查初始登录状态
+            checkLoginState();
+            
+            // 4. (你原来的逻辑) 加载文章列表
+            loadPosts();
+        });
+    </script>
+
+</body>
+</html>
